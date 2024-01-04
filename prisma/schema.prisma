@@ -1,0 +1,41 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// schema.prisma
+
+model Category {
+  id            Int     @id @default(autoincrement())
+  name          String  @map("name")
+  order         Int     @unique
+
+  Menu          Menu[]
+
+  @@map("Category")
+}
+
+// 1:N 외래키 연관관계에 해당하는데
+// @ 하나 붙으면 필드명을 ~이렇게 명명하겠다, 라는 뜻이고
+// @@ 두개 붙으면 테이블 명을 ~이렇게 명명하겠다.
+
+model Menu {
+  id            Int     @id @default(autoincrement())
+  CategoryID    Int     
+  name          String  @map("name")
+  description   String  
+  image         String  @map("image")
+  price         Int     @map("price")
+  status        String  @map("status") @default("FOR_SALE")
+
+  Category      Category @relation(fields : [CategoryID], references : [id], onDelete : Cascade)
+
+  @@map("Menu")
+}
