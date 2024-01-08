@@ -1,25 +1,44 @@
 import express from 'express';
+import Joi from 'joi';
 import { prisma } from '../utils/prisma/index.js';
+import authMiddleware from '../middlewares/auth.middleware.js';
+
+// import authMiddlewares from '../middlewares/auth.middleware.js';
 
 const router = express.Router(); // express.Router()를 이용해 라우터를 생성합니다.
 
+const checkCategory = Joi.object({
+    name: Joi.string().min(2).max(20).required(),
+    order: Joi.number(),
+})
 
 // 카테고리 등록 API
-router.post('/category', async (req, res, next) => {
+router.post('/category', authMiddleware, async (req, res, next) => {
     try {
-        const { name, order } = req.body;
-        const category = await prisma.category.create({
+        // console.log(req.user);
+        const { id } = req.user;
+        if (req.user.userType !== "Owner") {
+            return res.status(401).json({ errorMessage: "사장님만 사용 가능한 API입니다." });
+        }
+        const { name, order } = await checkCategory.validateAsync(req.body);
+        // const category = await prisma.category.create({ // 앞에 변수 선언 지워도 작동함..!!!
+        await prisma.category.create({
             data: {
+                userId : id, // 컬럼명 : 위에서 가져오는 값
                 name,
                 order
             }
         });
         if (!name || !order) {
-            return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." });
+            // return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." });
+            return next(new Error("400"));
         }
-        // return res.status(201).json({ data: category });
+        // return res.status(201).json({ data: category }); // 변수 선언 안했으니 지우는데, 원래는 카테고리등록값이 나옴
         return res.status(201).json({ Message: "카테고리를 등록하였습니다." });
-    } catch (error) { return res.status(400).json({ eerrorMessage: "데이터 형식이 올바르지 않습니다." }) };
+        } catch (error) { return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." }) };
+    // } catch (err) {
+    //     next(err)
+    // }
 });
 
 // 카테고리 조회 API
@@ -37,15 +56,19 @@ router.get('/category', async (req, res, next) => {
 });
 
 // 카테고리 수정 API
-router.patch('/category/:categoryId', async (req, res, next) => {
+router.patch('/category/:categoryId', authMiddleware, async (req, res, next) => {
     try {
         const { categoryId } = req.params; // 수정하고자 하는 카테고리의 고유id값을 받아온다~
-        const { name, order } = req.body; // 카테고리이름을 body에 뿌려준다~
+        if (req.user.userType !== "Owner") {
+            return res.status(401).json({ errorMessage: "사장님만 사용 가능한 API입니다." });
+        }
+        const { name, order } = await checkCategory.validateAsync(req.body); // 카테고리이름을 body에 뿌려준다~
         if (!name || !order) {
-            return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." });
+            // return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." });
+            return next(new Error("400"));
         }
 
-        const category = await prisma.category.findUnique({ // 너가 못알아볼거 아니까 도움되라고 써둔다 50번째줄 참고
+        const category = await prisma.category.findUnique({
             where: { id: +categoryId }
         });
         // prisma 라는 ORM라이브러리를 사용해서 db에서 특정 카테고리 정보를 가져오려는 코드임
@@ -70,17 +93,22 @@ router.patch('/category/:categoryId', async (req, res, next) => {
 });
 
 // 카테고리 삭제 API
-router.delete('/category/:categoryId', async (req, res, next) => {
+router.delete('/category/:categoryId', authMiddleware, async (req, res, next) => {
     try {
         const { categoryId } = req.params;
+        if (req.user.userType !== "Owner") {
+            return res.status(401).json({ errorMessage: "사장님만 사용 가능한 API입니다." });
+        }
         if (!categoryId) {
-            return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." });
+            // return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." });
+            return next(new Error("400"));
         }
         const category = await prisma.category.findUnique({
             where: { id: +categoryId }
         });
         if (!category) {
-            return res.status(404).json({ errorMessage: "존재하지 않는 카테고리입니다." });
+            // return res.status(404).json({ errorMessage: "존재하지 않는 카테고리입니다." });
+            return next(new Error("404"));
         }
 
         await prisma.category.delete({

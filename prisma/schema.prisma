@@ -16,8 +16,10 @@ model Category {
   id            Int     @id @default(autoincrement())
   name          String  @map("name")
   order         Int     @unique
+  userId        Int     @map("userId")
 
   Menu          Menu[]
+  Users         Users@relation(fields : [userId], references : [id], onDelete : Cascade)
 
   @@map("Category")
 }
@@ -38,4 +40,23 @@ model Menu {
   Category      Category @relation(fields : [CategoryID], references : [id], onDelete : Cascade)
 
   @@map("Menu")
+}
+
+model Users {
+  id            Int     @id @default(autoincrement())
+  nickname      String  @unique @map("nickname")
+  password      String  @map("password")
+  userType      String  @map("userType") @default("Customer")
+
+  Category      Category[]
+
+  // 둘다 외래키 참조 1:N에 쓰이는데, 1:N = user : category   1에 해당하는 user인 경우 a a[]를 하고
+  // N에 해당하는 Category의 경우 @relation을 붙힘
+
+  // userType 별다른 입력이 없다면 Customer 상태가 되어야함
+
+  // authorization String  @map("authorization")
+  // authorization의 경우 Token 발급을 할 때 이 토큰이 누구꺼 토큰인지 구분하려고 씀
+
+  @@map("Users")
 }
