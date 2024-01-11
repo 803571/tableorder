@@ -81,7 +81,31 @@ router.post('/category/:categoryId/menu', authMiddleware, async (req, res, next)
 //     } catch (error) { return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." }) };
 // });
 
-// 메뉴 상세 조회 api 2
+// 메뉴 상세 조회 api 2 (기존 api 입니다.)
+// router.get('/category/:categoryId/menu/:menuId', async (req, res, next) => {
+//     try {
+//         const { categoryId, menuId } = req.params;
+
+//         const menu = await prisma.menu.findUnique({
+//             where: {
+//                 id: +menuId,
+//                 CategoryID: +categoryId,
+//             },
+//             include: {
+//                 Category: true,
+//             },
+//         });
+
+//         if (!menu) {
+//             // return res.status(404).json({ errorMessage: "존재하지 않는 카테고리입니다." });
+//             return next(new Error("404"));
+//         }
+
+//         res.json(menu);
+//     } catch (error) { return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." }) };
+// });
+
+// 메뉴 상세 조회 api 2 (소프트 삭제를 반영한 API 입니다.)
 router.get('/category/:categoryId/menu/:menuId', async (req, res, next) => {
     try {
         const { categoryId, menuId } = req.params;
@@ -90,9 +114,16 @@ router.get('/category/:categoryId/menu/:menuId', async (req, res, next) => {
             where: {
                 id: +menuId,
                 CategoryID: +categoryId,
+                isDeleted: null, // 소프트 삭제된 메뉴를 제외하고.
             },
             include: {
-                Category: true,
+                name: true,
+                description: true, // 메뉴 설명 추가
+                image: true,
+                price: true,
+                order: true,
+                status: true, //문제 생기면 name 부터 status까지 삭제
+                Category: true, 
             },
         });
 
@@ -105,7 +136,30 @@ router.get('/category/:categoryId/menu/:menuId', async (req, res, next) => {
     } catch (error) { return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." }) };
 });
 
-// 카테고리별 메뉴 조회 API
+// // 카테고리별 메뉴 조회 API (기존 조회 API입니다. 백업용)
+// router.get('/category/:categoryId/menu', async (req, res, next) => {
+//     try {
+//         const { categoryId } = req.params;
+
+//         const menu = await prisma.menu.findMany({
+//             where: {
+//                 CategoryID: +categoryId,
+//             },
+//             include: {
+//                 Category: true,
+//             },
+//         });
+
+//         if (menu.length === 0) {
+//             // return res.status(404).json({ errorMessage: "존재하지 않는 카테고리입니다." });
+//             return next(new Error("404"));
+//         }
+
+//         res.json(menu);
+//     } catch (error) { return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." }) };
+// });
+
+// 카테고리별 메뉴 조회 API (소프트 삭제를 반영합니다.)
 router.get('/category/:categoryId/menu', async (req, res, next) => {
     try {
         const { categoryId } = req.params;
@@ -113,8 +167,17 @@ router.get('/category/:categoryId/menu', async (req, res, next) => {
         const menu = await prisma.menu.findMany({
             where: {
                 CategoryID: +categoryId,
+                isDeleted: null, // 소프트 삭제된 메뉴를 제외
+            },
+            orderBy: {
+                order: "asc", // 순서에 따라 오름차순으로 정렬합니다.
             },
             include: {
+                name: true,
+                image: true,
+                price: true,
+                order: true,
+                status: true, //혹시 조회에 문제가 생겼다면 name ~ status는 모두 삭제해보기
                 Category: true,
             },
         });
@@ -128,7 +191,55 @@ router.get('/category/:categoryId/menu', async (req, res, next) => {
     } catch (error) { return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." }) };
 });
 
-// 메뉴 수정 API
+// 메뉴 수정 API (기존 api입니다.)
+// router.patch('/category/:categoryId/menu/:menuId', authMiddleware, async (req, res, next) => {
+//     try {
+//         const { categoryId, menuId } = req.params;
+//         if (req.user.userType !== "Owner") {
+//             return res.status(401).json({ errorMessage: "사장님만 사용 가능한 API입니다." });
+//         }
+//         const { name, description, price, order, status } = await checkMenu.validateAsync(req.body);
+
+//         // 메뉴 가격이 0보다 작은 경우
+//         if (price < 0) {
+//             return res.status(400).json({ errorMessage: "메뉴 가격은 0보다 작을 수 없습니다." })
+//         }
+
+//         // 카테고리 존재 여부 확인
+//         const categoryExists = await prisma.category.findUnique({
+//             where: { id: +categoryId },
+//         });
+
+//         if (!categoryExists) {
+//             return res.status(404).json({ errorMessage: "존재하지 않는 카테고리입니다." })
+//             // return next(new Error("404"));
+//         }
+
+//         // 메뉴 수정
+//         // const updatedMenu = await prisma.menu.update({
+//         await prisma.menu.update({
+//             where: { id: +menuId },
+//             data: {
+//                 name,
+//                 description,
+//                 price,
+//                 status,
+//                 Category: { connect: { id: +categoryId } },
+//             },
+//         });
+
+//         // res.json({ message: '메뉴를 수정하였습니다.', updatedMenu });
+//         res.status(201).json({ message: '메뉴를 수정하였습니다.' });
+//     } catch (error) {
+//         // menuId에 해당하는 메뉴가 존재하지 않을 경우
+//         if (error.code === 'P2025') {
+//             return res.status(404).json({ errorMessage: "존재하지 않는 메뉴입니다." })
+//         }
+//         next(error);
+//     }
+// });
+
+// 메뉴 수정 API (소프트 삭제를 반영한 API 입니다.)
 router.patch('/category/:categoryId/menu/:menuId', authMiddleware, async (req, res, next) => {
     try {
         const { categoryId, menuId } = req.params;
@@ -140,6 +251,15 @@ router.patch('/category/:categoryId/menu/:menuId', authMiddleware, async (req, r
         // 메뉴 가격이 0보다 작은 경우
         if (price < 0) {
             return res.status(400).json({ errorMessage: "메뉴 가격은 0보다 작을 수 없습니다." })
+        }
+
+        // 소프트 삭제된 메뉴는 수정할 수 없음
+        const existingMenu = await prisma.menu.findUnique({
+            where: { id: +menuId },
+        });
+        if (!existingMenu || existingMenu.isDeleted) {
+            return res.status(404).json({ errorMessage: "존재하지 않는 메뉴입니다." })
+
         }
 
         // 카테고리 존재 여부 확인
@@ -176,43 +296,87 @@ router.patch('/category/:categoryId/menu/:menuId', authMiddleware, async (req, r
     }
 });
 
+// 메뉴 삭제 API (기존 api입니다.)
+// router.delete('/category/:categoryId/menu/:menuId', authMiddleware, async (req, res, next) => {
+//     try {
+//         const { categoryId, menuId } = req.params;
+//         if (req.user.userType !== "Owner") {
+//             return res.status(401).json({ errorMessage: "사장님만 사용 가능한 API입니다." });
+//         }
+//         // categoryId와 menuId가 입력되지 않은 경우
+//         if (!categoryId || !menuId) {
+//             // return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." });
+//             return next(new Error("400"));
+//         }
+
+//         // 카테고리 존재 여부 확인
+//         const categoryExists = await prisma.category.findUnique({
+//             where: { id: +categoryId },
+//         });
+
+//         // categoryId에 해당하는 카테고리가 존재하지 않을 경우
+//         if (!categoryExists) {
+//             // return res.status(404).json({ errorMessage: "존재하지 않는 카테고리입니다." });
+//             return next(new Error("404"));
+//         }
+
+//         // 메뉴 삭제
+//         const deletedMenu = await prisma.menu.delete({
+//             where: { id: +menuId },
+//         });
+
+//         // 메뉴가 존재하지 않을 경우
+//         if (!deletedMenu) {
+//             // return res.status(404).json({ errorMessage: "존재하지 않는 메뉴입니다." });
+//             return next(new Error("404"));
+//         }
+
+//         res.status(201).json({ Message: "메뉴를 삭제하였습니다." });
+//     } catch (error) { return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." }) };
+// });
+
 // 메뉴 삭제 API
-router.delete('/category/:categoryId/menu/:menuId', authMiddleware, async (req, res, next) => {
+router.delete('/category/:categoryId', authMiddleware, async (req, res, next) => {
     try {
-        const { categoryId, menuId } = req.params;
+        const { categoryId } = req.params;
         if (req.user.userType !== "Owner") {
             return res.status(401).json({ errorMessage: "사장님만 사용 가능한 API입니다." });
         }
-        // categoryId와 menuId가 입력되지 않은 경우
-        if (!categoryId || !menuId) {
-            // return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." });
-            return next(new Error("400"));
-        }
 
-        // 카테고리 존재 여부 확인
-        const categoryExists = await prisma.category.findUnique({
-            where: { id: +categoryId },
+        const category = await prisma.category.findUnique({
+            where: { id: +categoryId }
         });
 
-        // categoryId에 해당하는 카테고리가 존재하지 않을 경우
-        if (!categoryExists) {
-            // return res.status(404).json({ errorMessage: "존재하지 않는 카테고리입니다." });
+        if (!category) {
             return next(new Error("404"));
         }
 
-        // 메뉴 삭제
-        const deletedMenu = await prisma.menu.delete({
-            where: { id: +menuId },
+        // 카테고리를 소프트 삭제 (isDeleted 필드를 현 시간으로 설정함)
+        await prisma.category.update({
+            where: {
+                id: +categoryId,
+            },
+            data: {
+                isDeleted: new Date()
+            }
         });
 
-        // 메뉴가 존재하지 않을 경우
-        if (!deletedMenu) {
-            // return res.status(404).json({ errorMessage: "존재하지 않는 메뉴입니다." });
-            return next(new Error("404"));
-        }
+        // 연관된 모든 메뉴도 소프트 삭제
+        await prisma.menu.updateMany({
+            where: {
+                CategoryID: +categoryId, // 'CategoryID' 필드 사용
+                // 추가적으로, isDeleted가 null인 항목만 업데이트할 수 있도록 조건을 추가할 수 있습니다.
+                isDeleted: null
+            },
+            data: {
+                isDeleted: new Date()
+            }
+        });
 
-        res.status(201).json({ Message: "메뉴를 삭제하였습니다." });
-    } catch (error) { return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." }) };
+        return res.status(200).json({ data: "카테고리 정보를 삭제하였습니다." });
+    } catch (error) {
+        return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." });
+    }
 });
 
 // 메뉴 주문 API 1

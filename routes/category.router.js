@@ -41,14 +41,36 @@ router.post('/category', authMiddleware, async (req, res, next) => {
     // }
 });
 
-// 카테고리 조회 API
+// 카테고리 조회 API (기존 api 입니다.)
+// router.get('/category', async (req, res, next) => {
+//     try {
+//         const category = await prisma.category.findMany({
+//             select: { // 아래에 특정 column 을 false 처리해서 안나오게 할 수 있지만, select 로 특정 column을 true로 설정하지 않으면 자동적으로 해당 column이 조회되지 않음
+//                 id: true,
+//                 name: true,
+//                 order: true,
+//             },
+//         });
+//         return res.status(200).json({ data: category });
+//     } catch (error) { return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." }) };
+// });
+
+// 카테고리 조회 API (소프트 삭제를 반영한 API 입니다.)
 router.get('/category', async (req, res, next) => {
     try {
         const category = await prisma.category.findMany({
+            where: {
+                deletedAt: null // 소프트 삭제된 항목을 제외
+            },
+
             select: { // 아래에 특정 column 을 false 처리해서 안나오게 할 수 있지만, select 로 특정 column을 true로 설정하지 않으면 자동적으로 해당 column이 조회되지 않음
                 id: true,
                 name: true,
                 order: true,
+            },
+
+            orderBy: {
+                order: "asc" //지정된 순서대로 정렬
             },
         });
         return res.status(200).json({ data: category });
@@ -62,12 +84,15 @@ router.patch('/category/:categoryId', authMiddleware, async (req, res, next) => 
         if (req.user.userType !== "Owner") {
             return res.status(401).json({ errorMessage: "사장님만 사용 가능한 API입니다." });
         }
+
+        // 입력한 값의 유효성 검사
         const { name, order } = await checkCategory.validateAsync(req.body); // 카테고리이름을 body에 뿌려준다~
         if (!name || !order) {
             // return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." });
             return next(new Error("400"));
         }
 
+        // 카테고리 존재 여부 및 소프트 삭제의 여부 화긴
         const category = await prisma.category.findUnique({
             where: { id: +categoryId }
         });
@@ -78,7 +103,11 @@ router.patch('/category/:categoryId', authMiddleware, async (req, res, next) => 
         // id필드가 categoryId와 일치하는 레코드를 찾으라는거임. +가 붙으면 그 변수를 정수로 강제변환하는거고
         // = categoryId에 해당하는 정보를 갖고와서 category에 할당하는 역할이니 기억안나면 이거라도 읽어라
 
-        if (!category) {
+        // if (!category) {    //기존 코드
+        //     return res.status(404).json({ errorMessage: "존재하지 않는 카테고리입니다." });
+        // }
+
+        if (!category || category.isDeleted) { // isDeleted 필드를 확인합니다.
             return res.status(404).json({ errorMessage: "존재하지 않는 카테고리입니다." });
         }
 
@@ -99,23 +128,49 @@ router.delete('/category/:categoryId', authMiddleware, async (req, res, next) =>
         if (req.user.userType !== "Owner") {
             return res.status(401).json({ errorMessage: "사장님만 사용 가능한 API입니다." });
         }
-        if (!categoryId) {
-            // return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." });
-            return next(new Error("400"));
-        }
+        
         const category = await prisma.category.findUnique({
             where: { id: +categoryId }
         });
+
+        // if (!categoryId) {
+        //     // return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." });
+        //     return next(new Error("400"));
+        // }
+        
         if (!category) {
             // return res.status(404).json({ errorMessage: "존재하지 않는 카테고리입니다." });
             return next(new Error("404"));
         }
 
-        await prisma.category.delete({
+        // 기존 삭제 기능
+        // await prisma.category.delete({
+        //     where: {
+        //         id: +categoryId,
+        //     }
+        // })
+        // return res.status(200).json({ data: "카테고리 정보를 삭제하였습니다." });
+        
+        // 카테고리를 소프트 삭제 (idDeleted 필드를 현 시간으로 설정함)
+        await prisma.category.update({
             where: {
                 id: +categoryId,
+            },
+            data: {
+                isDeleted: new Date()
             }
-        })
+        });
+
+        // 연관된 모든 메뉴도 소프트 삭제
+        await prisma.menu.updateMany({
+            where: {
+                categoryId: +categoryId,
+            },
+            data: {
+                isDeleted: new Date()
+            }
+        });
+
         return res.status(200).json({ data: "카테고리 정보를 삭제하였습니다." });
     } catch (error) { return res.status(400).json({ errorMessage: "데이터 형식이 올바르지 않습니다." }) };
 });

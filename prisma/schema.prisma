@@ -21,6 +21,10 @@ model Category {
   Menu          Menu[]
   Users         Users@relation(fields : [userId], references : [id], onDelete : Cascade)
 
+  deletedAt     DateTime? @map("deletedAt") // 소프트 삭제를 위한 필드입니다.
+  isDeleted     DateTime? @map("isDeleted") // 소프트 삭제 상태를 확인하는 조건이 필요해서 추가한 필드입니다.
+  // 카테고리가 삭제되지 않으면 null, 삭제되면 삭제된 시점의 날짜와 시간을 기록.
+
   @@map("Category")
 }
 
@@ -39,6 +43,10 @@ model Menu {
 
   Category      Category @relation(fields : [CategoryID], references : [id], onDelete : Cascade)
   Orders        Order[]
+
+  deletedAt     DateTime? @map("deletedAt") // 소프트 삭제를 위한 필드입니다.
+  isDeleted     DateTime? @map("isDeleted") // 소프트 삭제 상태를 확인하는 조건이 필요해서 추가한 필드입니다.
+  // 카테고리가 삭제되지 않으면 null, 삭제되면 삭제된 시점의 날짜와 시간을 기록.
 
   @@map("Menu")
 }
